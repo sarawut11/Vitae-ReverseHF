@@ -397,13 +397,13 @@ void PrintExceptionContinue(const std::exception* pex, const char* pszThread)
 boost::filesystem::path GetDefaultDataDir()
 {
     namespace fs = boost::filesystem;
-// Windows < Vista: C:\Documents and Settings\Username\Application Data\PIVX
-// Windows >= Vista: C:\Users\Username\AppData\Roaming\PIVX
-// Mac: ~/Library/Application Support/PIVX
-// Unix: ~/.pivx
+// Windows < Vista: C:\Documents and Settings\Username\Application Data\Vitae
+// Windows >= Vista: C:\Users\Username\AppData\Roaming\Vitae
+// Mac: ~/Library/Application Support/Vitae
+// Unix: ~/.vitae
 #ifdef WIN32
     // Windows
-    return GetSpecialFolderPath(CSIDL_APPDATA) / "PIVX";
+    return GetSpecialFolderPath(CSIDL_APPDATA) / "Vitae";
 #else
     fs::path pathRet;
     char* pszHome = getenv("HOME");
@@ -415,10 +415,10 @@ boost::filesystem::path GetDefaultDataDir()
     // Mac
     pathRet /= "Library/Application Support";
     TryCreateDirectory(pathRet);
-    return pathRet / "PIVX";
+    return pathRet / "Vitae";
 #else
     // Unix
-    return pathRet / ".pivx";
+    return pathRet / ".vitae";
 #endif
 #endif
 }

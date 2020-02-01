@@ -19,10 +19,7 @@
 
 unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHeader* pblock)
 {
-    if (Params().IsRegTestNet())
-        return pindexLast->nBits;
-
-    /* current difficulty formula, pivx - DarkGravity v3, written by Evan Duffield - evan@dashpay.io */
+    /* current difficulty formula, vitae - DarkGravity v3, written by Evan Duffield - evan@dashpay.io */
     const CBlockIndex* BlockLastSolved = pindexLast;
     const CBlockIndex* BlockReading = pindexLast;
     int64_t nActualTimespan = 0;
@@ -37,11 +34,10 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
         return Params().ProofOfWorkLimit().GetCompact();
     }
 
-    if (pindexLast->nHeight >= Params().LAST_POW_BLOCK()) {
-        const bool fTimeV2 = Params().IsTimeProtocolV2(pindexLast->nHeight+1);
-        const uint256 bnTargetLimit = Params().ProofOfStakeLimit(fTimeV2);
-        const int64_t nTargetSpacing = Params().TargetSpacing();
-        const int64_t nTargetTimespan = Params().TargetTimespan(fTimeV2);
+    if (pindexLast->nHeight > Params().LAST_POW_BLOCK()) {
+        uint256 bnTargetLimit = (~uint256(0) >> 24);
+        int64_t nTargetSpacing = 45;
+        int64_t nTargetTimespan = 45 * 40;
 
         int64_t nActualSpacing = 0;
         if (pindexLast->nHeight != 0)

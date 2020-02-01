@@ -92,6 +92,7 @@ public:
     int FutureBlockTimeDrift(const int nHeight) const;
     bool IsValidBlockTimeStamp(const int64_t nTime, const int nHeight) const;
 
+    int FundamentalnodeCountDrift() const { return nFundamentalnodeCountDrift; }
     /** The masternode count that we will allow the see-saw reward payments to be off by */
     int MasternodeCountDrift() const { return nMasternodeCountDrift; }
     /** Make miner stop after a block is found. In RPC, don't return until nGenProcLimit blocks are generated */
@@ -117,7 +118,7 @@ public:
     int64_t NewSporkStart() const { return nEnforceNewSporkKey; }
     int64_t RejectOldSporkKey() const { return nRejectOldSporkKey; }
     std::string ObfuscationPoolDummyAddress() const { return strObfuscationPoolDummyAddress; }
-    int64_t StartMasternodePayments() const { return nStartMasternodePayments; }
+    int64_t StartFundamentalnodePayments() const { return nStartFundamentalnodePayments; }
     int64_t Budget_Fee_Confirmations() const { return nBudget_Fee_Confirmations; }
 
     CBaseChainParams::Network NetworkID() const { return networkID; }
@@ -186,6 +187,7 @@ protected:
     int64_t nPivxBadBlockTime;
     unsigned int nPivxBadBlocknBits;
     int nMasternodeCountDrift;
+    int nFundamentalnodeCountDrift;
     int nMaturity;
     int nStakeMinDepth;
     int nStakeMinAge;
@@ -216,7 +218,7 @@ protected:
     int64_t nEnforceNewSporkKey;
     int64_t nRejectOldSporkKey;
     std::string strObfuscationPoolDummyAddress;
-    int64_t nStartMasternodePayments;
+    int64_t nStartFundamentalnodePayments;
     std::string zerocoinModulus;
     int nMaxZerocoinSpendsPerTransaction;
     int nMaxZerocoinPublicSpendsPerTransaction;
@@ -230,8 +232,9 @@ protected:
     int nZerocoinStartHeight;
     int nZerocoinStartTime;
     int nZerocoinRequiredStakeDepth;
-    int64_t nProposalEstablishmentTime;
     int nBIP65ActivationHeight;
+    int nBlockRHFUpgrades;
+    int64_t nProposalEstablishmentTime;
 
     int nBlockEnforceSerialRange;
     int nBlockRecalculateAccumulators;

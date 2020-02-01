@@ -77,7 +77,12 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet* 
             if (ExtractDestination(wtx.vout[nIndexMN].scriptPubKey, destMN) && IsMine(*wallet, destMN)) {
                 isminetype mine = wallet->IsMine(wtx.vout[nIndexMN]);
                 sub.involvesWatchAddress = mine & ISMINE_WATCH_ONLY;
+                if(nIndexMN == 2){
+                sub.type = TransactionRecord::FNReward;
+                }
+                else{
                 sub.type = TransactionRecord::MNReward;
+                }
                 sub.address = CBitcoinAddress(destMN).ToString();
                 sub.credit = wtx.vout[nIndexMN].nValue;
             }
