@@ -203,7 +203,7 @@ public:
         nBlockEnforceNewMessageSignatures = 1080000;
 
         // Blocks v7
-        nBlockLastAccumulatorCheckpoint = 891730;
+        nBlockLastAccumulatorCheckpoint = 905470;
         nBlockV7StartHeight = nBlockRHFUpgrades;
 
         // Fake Serial Attack
