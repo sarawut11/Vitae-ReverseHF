@@ -38,6 +38,7 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
         uint256 bnTargetLimit = (~uint256(0) >> 24);
         int64_t nTargetSpacing = 45;
         int64_t nTargetTimespan = 45 * 40;
+        const bool fTimeV2 = Params().IsTimeProtocolV2(pindexLast->nHeight+1);
 
         int64_t nActualSpacing = 0;
         if (pindexLast->nHeight != 0)

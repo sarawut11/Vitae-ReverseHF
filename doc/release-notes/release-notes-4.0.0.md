@@ -446,7 +446,7 @@ Detailed release notes follow. For convenience in locating the code changes and 
 - #1122 `641b1d6bbe` [GUI][Backport] Explicitly disable "Dark Mode" appearance on macOS (fanquake)
 - #1123 `a4fb368d39` [GUI] Prevent worker constant creation and invalid removal (furszy)
 - #1124 `bbb0125077` [GUI] Use QRegexValidator instead of the QDoubleValidator. (furszy)
-- #1125 `c6e238ca4d` [GUI] Inform if open pivx.conf and/or backups folder fail. (furszy)
+- #1125 `c6e238ca4d` [GUI] Inform if open vitae.conf and/or backups folder fail. (furszy)
 - #1126 `c910490c53` [BUG] Fix send transaction detail destinations (furszy)
 - #1130 `c582cabbd3` [UI] Copy correct data from mninfo dialog (Akshay)
 - #1131 `8ca5db691b` [Bug] URI read from file coded properly.. (furszy)

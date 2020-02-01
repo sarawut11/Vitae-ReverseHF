@@ -415,7 +415,7 @@ class PivxTestFramework():
                 from_dir = get_datadir_path(origin, i)
                 to_dir = get_datadir_path(destination, i)
                 shutil.copytree(from_dir, to_dir)
-                initialize_datadir(destination, i)  # Overwrite port/rpcport in pivx.conf
+                initialize_datadir(destination, i)  # Overwrite port/rpcport in vitae.conf
 
         def clone_cache_from_node_1(cachedir, from_num=4):
             """ Clones cache subdir from node 1 to nodes from 'from_num' to MAX_NODES"""
@@ -430,7 +430,7 @@ class PivxTestFramework():
                 for subdir in ["blocks", "chainstate", "sporks", "zerocoin"]:
                     copy_and_overwrite(os.path.join(node_0_datadir, subdir),
                                     os.path.join(node_i_datadir, subdir))
-                initialize_datadir(cachedir, i)  # Overwrite port/rpcport in pivx.conf
+                initialize_datadir(cachedir, i)  # Overwrite port/rpcport in vitae.conf
 
         def cachedir_valid(cachedir):
             for i in range(MAX_NODES):

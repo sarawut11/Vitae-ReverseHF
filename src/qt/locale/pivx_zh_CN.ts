@@ -470,8 +470,8 @@ for staking</source>
         <translation>文本标签</translation>
     </message>
     <message>
-        <source>Not all transactions will be shown. To view all transactions you need to set txindex=1 in the configuration file (pivx.conf).</source>
-        <translation>并不显示所有的交易。要查看所有交易，您需要在配置文件(pivx.conf)中设置txindex=1。</translation>
+        <source>Not all transactions will be shown. To view all transactions you need to set txindex=1 in the configuration file (vitae.conf).</source>
+        <translation>并不显示所有的交易。要查看所有交易，您需要在配置文件(vitae.conf)中设置txindex=1。</translation>
     </message>
 </context>
 <context>
@@ -1866,7 +1866,7 @@ Please wait few more minutes.</source>
 on a remote server to your clipboard.
 
 
-You will only have to paste the data in the pivx.conf file
+You will only have to paste the data in the vitae.conf file
 of your remote server and start it, then start the Masternode using
 this controller wallet (select the Masternode in the list and press "start").
 </source>
@@ -1874,7 +1874,7 @@ this controller wallet (select the Masternode in the list and press "start").
 到剪贴板的远程服务器上。
 
 
-您只需将数据粘贴到pivx.conf文件中
+您只需将数据粘贴到vitae.conf文件中
 ，然后使用主节点启动它
 这个控制器钱包(在列表中选择主节点并按“开始”)。
 </translation>
@@ -4621,8 +4621,8 @@ PIVX零币(zPIV)技术文件
         <translation>无法打开备份文件夹</translation>
     </message>
     <message>
-        <source>Unable to open pivx.conf with default application</source>
-        <translation>无法使用默认应用程序打开pivx.conf</translation>
+        <source>Unable to open vitae.conf with default application</source>
+        <translation>无法使用默认应用程序打开vitae.conf</translation>
     </message>
     <message>
         <source>In:</source>

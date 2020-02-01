@@ -217,7 +217,7 @@ parts:
       fi
       echo "-----------------------------------------------"
       echo "+++++++++++++++++++++++++++++++++++++++++++++++"
-      echo "CONFIG FILE" # create .pivx folder and copy example config - !!!warning!!!: do not copy as pivx.conf
+      echo "CONFIG FILE" # create .pivx folder and copy example config - !!!warning!!!: do not copy as vitae.conf
       echo "+++++++++++++++++++++++++++++++++++++++++++++++"
       mkdir -p ${SNAP_USER_COMMON}/.${DATADIR}
       if [ $COPYCONF = 1 ]; then

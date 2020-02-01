@@ -167,6 +167,8 @@ public:
         nTargetSpacing = 1 * 45;  // VITAE: 45 seconds
         nMaturity = 8;
         nStakeMinDepth = 600;
+        nTimeSlotLength = 15;                           // 15 seconds
+        nTargetTimespan_V2 = 2 * nTimeSlotLength * 60;  // 30 minutes
         nFutureTimeDriftPoW = 7200;
         nFutureTimeDriftPoS = 180;
         nFundamentalnodeCountDrift = 20;
@@ -191,16 +193,16 @@ public:
         nBlockDoubleAccumulated = 1050010;
         nEnforceNewSporkKey = 1566860400; //!> Sporks signed after Monday, August 26, 2019 11:00:00 PM GMT must use the new spork key
         nRejectOldSporkKey = 1569538800; //!> Fully reject old spork key after Thursday, September 26, 2019 11:00:00 PM GMT
-        nBlockStakeModifierlV2 = 1080000;
+        nBlockStakeModifierlV2 = nBlockRHFUpgrades;
         nBIP65ActivationHeight = 1808634;
         // Activation height for TimeProtocolV2, Blocks V7 and newMessageSignatures
-        nBlockTimeProtocolV2 = 2153200;
+        nBlockTimeProtocolV2 = nBlockRHFUpgrades;
 
         // Public coin spend enforcement
         nPublicZCSpends = nBlockRHFUpgrades;
 
         // New P2P messages signatures
-        nBlockEnforceNewMessageSignatures = 1080000;
+        nBlockEnforceNewMessageSignatures = nBlockRHFUpgrades;
 
         // Blocks v7
         nBlockLastAccumulatorCheckpoint = 905470;

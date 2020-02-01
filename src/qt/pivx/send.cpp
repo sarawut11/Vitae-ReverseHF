@@ -396,7 +396,7 @@ bool SendWidget::sendZpiv(QList<SendCoinsRecipient> recipients){
         return false;
 
     if(sporkManager.IsSporkActive(SPORK_19_ZEROCOIN_MAINTENANCE_MODE)) {
-        emit message(tr("Spend Zerocoin"), tr("zPIV is currently undergoing maintenance."), CClientUIInterface::MSG_ERROR);
+        Q_EMIT message(tr("Spend Zerocoin"), tr("zPIV is currently undergoing maintenance."), CClientUIInterface::MSG_ERROR);
         return false;
     }
 

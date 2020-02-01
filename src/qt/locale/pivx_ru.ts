@@ -469,8 +469,8 @@ for staking</source>
         <translation>Текстовая метка</translation>
     </message>
     <message>
-        <source>Not all transactions will be shown. To view all transactions you need to set txindex=1 in the configuration file (pivx.conf).</source>
-        <translation>Будут показаны не все транзакции. Для отображения всех транзакций необходимо выставить txindex=1 в конфигурационном файле (pivx.conf).</translation>
+        <source>Not all transactions will be shown. To view all transactions you need to set txindex=1 in the configuration file (vitae.conf).</source>
+        <translation>Будут показаны не все транзакции. Для отображения всех транзакций необходимо выставить txindex=1 в конфигурационном файле (vitae.conf).</translation>
     </message>
 </context>
 <context>
@@ -1864,7 +1864,7 @@ Please wait few more minutes.</source>
 on a remote server to your clipboard.
 
 
-You will only have to paste the data in the pivx.conf file
+You will only have to paste the data in the vitae.conf file
 of your remote server and start it, then start the Masternode using
 this controller wallet (select the Masternode in the list and press "start").
 </source>
@@ -1872,7 +1872,7 @@ this controller wallet (select the Masternode in the list and press "start").
 на удаленном сервере в буфер обмена.
 
 
-Вам необходимо только вставить данные в файл pivx.conf
+Вам необходимо только вставить данные в файл vitae.conf
 вашего удаленного сервера и запустить его, а затем запустить мастерноду,
 используя этот кошелек контроллера (выберите мастерноду из списка и нажмите «Старт»).
 </translation>
@@ -4291,7 +4291,7 @@ zPIV - это необязательная конфиденциальность,
                            you can disable the automatic minting in your PIVX wallet by
                            going to Settings-&gt;Options and deselecting “Enable zPIV Automint”.
                            If you are not making use of the PIVX-QT or GUI you can simply open
-                           your pivx.conf file and add &lt;i&gt;enablezeromint=0&lt;/i&gt; Without the quotation
+                           your vitae.conf file and add &lt;i&gt;enablezeromint=0&lt;/i&gt; Without the quotation
                            marks and restart your wallet to disable automint.&lt;/p&gt;
                            &lt;/p&gt;&lt;p align="justify"&gt;
                            You can read more about zPIV in the
@@ -4308,7 +4308,7 @@ zPIV - это необязательная конфиденциальность,
 вы можете отключить автоматическую чеканку в своем PIVX-кошельке,
 перейдя в «Настройки-&gt; Параметры» и отменив выбор «Включить авточекунку zPIV».
 Если вы не используете PIVX-QT или GUI, вы можете просто открыть
-свой файл pivx.conf и добавить &lt;i&gt;enablezeromint=0&lt;/i&gt; без кавычек и
+свой файл vitae.conf и добавить &lt;i&gt;enablezeromint=0&lt;/i&gt; без кавычек и
 перезапустите свой кошелек для отключения  автоматической чеканки. &lt;/p&gt; &lt;/p&gt;&lt;p align="justify"&gt; Вы можете прочитать больше о zPIV в
 &lt;a style='color: #b088ff' href='https://PIVX.org/zpiv/'&gt;
  "Технический документ PIVX Zerocoin (zPIV)"&lt;/a&gt;.
@@ -4616,8 +4616,8 @@ zPIV можно потратить и отправить на любой адр�
         <translation>Невозможно открыть папку резервных копий</translation>
     </message>
     <message>
-        <source>Unable to open pivx.conf with default application</source>
-        <translation>Невозможно открыть pivx.conf с приложением по умолчанию</translation>
+        <source>Unable to open vitae.conf with default application</source>
+        <translation>Невозможно открыть vitae.conf с приложением по умолчанию</translation>
     </message>
     <message>
         <source>In:</source>

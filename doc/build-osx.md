@@ -85,9 +85,9 @@ Before running, you may create an empty configuration file:
 
     mkdir -p "/Users/${USER}/Library/Application Support/PIVX"
 
-    touch "/Users/${USER}/Library/Application Support/PIVX/pivx.conf"
+    touch "/Users/${USER}/Library/Application Support/PIVX/vitae.conf"
 
-    chmod 600 "/Users/${USER}/Library/Application Support/PIVX/pivx.conf"
+    chmod 600 "/Users/${USER}/Library/Application Support/PIVX/vitae.conf"
 
 The first time you run pivxd, it will start downloading the blockchain. This process could take many hours, or even days on slower than average systems.
 

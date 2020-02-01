@@ -470,8 +470,8 @@ para staking</translation>
         <translation>EtiquetaDeTexto</translation>
     </message>
     <message>
-        <source>Not all transactions will be shown. To view all transactions you need to set txindex=1 in the configuration file (pivx.conf).</source>
-        <translation>No se muestran todas las transacciones. Para ver todas las transacciones introduzca la línea "txindex=1" en el archivo de configuración (pivx.conf).</translation>
+        <source>Not all transactions will be shown. To view all transactions you need to set txindex=1 in the configuration file (vitae.conf).</source>
+        <translation>No se muestran todas las transacciones. Para ver todas las transacciones introduzca la línea "txindex=1" en el archivo de configuración (vitae.conf).</translation>
     </message>
 </context>
 <context>
@@ -1863,14 +1863,14 @@ Por favor, espera unos minutos más. </translation>
 on a remote server to your clipboard.
 
 
-You will only have to paste the data in the pivx.conf file
+You will only have to paste the data in the vitae.conf file
 of your remote server and start it, then start the Masternode using
 this controller wallet (select the Masternode in the list and press "start").
 </source>
         <translation>Estás a punto de exportar los datos necesarios para ejecutar un Masternode de un servidor remoto a tu portapapeles.
 
 
-Sólo tendrás que pegar los datos en el archivo pivx.conf de tu servidor remoto e iniciarlo, luego inicia el Masternode usando esta cartera de controladores (selecciona el Masternode en la lista y presione "start").
+Sólo tendrás que pegar los datos en el archivo vitae.conf de tu servidor remoto e iniciarlo, luego inicia el Masternode usando esta cartera de controladores (selecciona el Masternode en la lista y presione "start").
 </translation>
     </message>
     <message>
@@ -4273,7 +4273,7 @@ zPIV es un método opcional centrado en la privacidad de monedas en la Blockchai
                            you can disable the automatic minting in your PIVX wallet by
                            going to Settings-&gt;Options and deselecting “Enable zPIV Automint”.
                            If you are not making use of the PIVX-QT or GUI you can simply open
-                           your pivx.conf file and add &lt;i&gt;enablezeromint=0&lt;/i&gt; Without the quotation
+                           your vitae.conf file and add &lt;i&gt;enablezeromint=0&lt;/i&gt; Without the quotation
                            marks and restart your wallet to disable automint.&lt;/p&gt;
                            &lt;/p&gt;&lt;p align="justify"&gt;
                            You can read more about zPIV in the
@@ -4290,7 +4290,7 @@ stake por zPIV o aprovechar el beneficio de privacidad que te brinda,
 puedes desactivar la acuñación automática en tu billetera PIVX yendo
 a Ajustes-&gt;Opciones y deseleccionando "Activar zPIV Automint".
 Si no estás haciendo uso de la PIVX-QT o GUI puedes simplemente abrir
-tu archivo pivx.conf y agregar &lt;i&gt; enablezeromint=0&lt;/i&gt; Sin las comillas
+tu archivo vitae.conf y agregar &lt;i&gt; enablezeromint=0&lt;/i&gt; Sin las comillas
 luego reinicia tu billetera para deshabilitar la impresión automática.&lt;/p&gt;
 &lt;/p&gt;&lt;p align="justify"&gt;
 Puedes leer más sobre zPIV en el
@@ -4626,8 +4626,8 @@ Requisitos:
         <translation>No se puede abrir la carpeta de copias de seguridad</translation>
     </message>
     <message>
-        <source>Unable to open pivx.conf with default application</source>
-        <translation>No se puede abrir pivx.conf con la aplicación predeterminada</translation>
+        <source>Unable to open vitae.conf with default application</source>
+        <translation>No se puede abrir vitae.conf con la aplicación predeterminada</translation>
     </message>
     <message>
         <source>In:</source>
