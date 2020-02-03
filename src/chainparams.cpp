@@ -182,7 +182,7 @@ public:
         nModifierUpdateBlock = 615800;
         nZerocoinStartHeight = 209467;
         nZerocoinStartTime = 1536314400; // October 17, 2017 4:30:00 AM
-        nBlockRHFUpgrades = 1115151;
+        nBlockRHFUpgrades = 1245693;
         nBlockEnforceSerialRange = 895400; //Enforce serial range starting this block
         nBlockRecalculateAccumulators = 908000; //Trigger a recalculation of accumulators
         nBlockFirstFraudulent = 891737; //First block that bad serials emerged
@@ -194,7 +194,7 @@ public:
         nEnforceNewSporkKey = 1566860400; //!> Sporks signed after Monday, August 26, 2019 11:00:00 PM GMT must use the new spork key
         nRejectOldSporkKey = 1569538800; //!> Fully reject old spork key after Thursday, September 26, 2019 11:00:00 PM GMT
         nBlockStakeModifierlV2 = nBlockRHFUpgrades;
-        nBIP65ActivationHeight = 1808634;
+        nBIP65ActivationHeight = 369647;
         // Activation height for TimeProtocolV2, Blocks V7 and newMessageSignatures
         nBlockTimeProtocolV2 = nBlockRHFUpgrades;
 

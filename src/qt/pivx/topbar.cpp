@@ -423,8 +423,8 @@ void TopBar::setNumBlocks(int count) {
             if(progress >= 0){
                 // todo: MN progress..
                 text = strprintf("Synchronizing masternodes data... - Block: %d", count);
-                //progressBar->setMaximum(4 * MASTERNODE_SYNC_THRESHOLD);
-                //progressBar->setValue(progress);
+                progressBar->setMaximum(4 * MASTERNODE_SYNC_THRESHOLD);
+                progressBar->setValue(progress);
                 needState = false;
             }
         }

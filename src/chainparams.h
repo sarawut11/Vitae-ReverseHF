@@ -153,7 +153,7 @@ public:
     int NewSigsActive(const int nHeight) const { return nHeight >= nBlockEnforceNewMessageSignatures; }
     int BIP65ActivationHeight() const { return nBIP65ActivationHeight; }
     int Block_V7_StartHeight() const { return nBlockV7StartHeight; }
-
+    int Block_RHF_UpgradeHeight() const {return nBlockRHFUpgrades;}
     // fake serial attack
     int Zerocoin_Block_EndFakeSerial() const { return nFakeSerialBlockheightEnd; }
     CAmount GetSupplyBeforeFakeSerial() const { return nSupplyBeforeFakeSerial; }
