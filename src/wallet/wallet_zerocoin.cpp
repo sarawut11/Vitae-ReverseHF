@@ -6,6 +6,7 @@
 
 #include "init.h"
 #include "coincontrol.h"
+#include "consensus/zerocoin_verify.h"
 #include "denomination_functions.h"
 #include "primitives/transaction.h"
 #include "script/sign.h"
@@ -22,16 +23,17 @@
 
 std::string CWallet::MintZerocoin(CAmount nValue, CWalletTx& wtxNew, std::vector<CDeterministicMint>& vDMints, const CCoinControl* coinControl)
 {
-    if (!Params().MineBlocksOnDemand())
-        return _("Zerocoin minting available only on regtest/unittest");
+    if (!Params().IsRegTestNet())
+        return _("Zerocoin minting available only on regtest");
 
     // Check amount
     if (nValue <= 0)
         return _("Invalid amount");
 
     CAmount nBalance = GetBalance();
-    if (nValue + Params().Zerocoin_MintFee() > nBalance) {
-        LogPrintf("%s: balance=%s fee=%s nValue=%s\n", __func__, FormatMoney(nBalance), FormatMoney(Params().Zerocoin_MintFee()), FormatMoney(nValue));
+    const CAmount& nFee = Params().GetConsensus().ZC_MinMintFee;
+    if (nValue + nFee > nBalance) {
+        LogPrintf("%s: balance=%s fee=%s nValue=%s\n", __func__, FormatMoney(nBalance), FormatMoney(nFee), FormatMoney(nValue));
         return _("Insufficient funds");
     }
 
@@ -92,7 +94,7 @@ std::string CWallet::MintZerocoinFromOutPoint(CAmount nValue, CWalletTx& wtxNew,
 bool CWallet::CreateZPIVOutPut(libzerocoin::CoinDenomination denomination, CTxOut& outMint, CDeterministicMint& dMint)
 {
     // mint a new coin (create Pedersen Commitment) and extract PublicCoin that is shareable from it
-    libzerocoin::PrivateCoin coin(Params().Zerocoin_Params(false), denomination, false);
+    libzerocoin::PrivateCoin coin(Params().GetConsensus().Zerocoin_Params(false), denomination, false);
     zwalletMain->GenerateDeterministicZPIV(denomination, coin, dMint);
 
     libzerocoin::PublicCoin pubCoin = coin.getPublicCoin();
@@ -171,7 +173,7 @@ bool CWallet::CreateZerocoinMintTransaction(const CAmount nValue,
     }
 
     // calculate fee
-    CAmount nTotalValue = nValue + Params().Zerocoin_MintFee() * txNew.vout.size();
+    CAmount nTotalValue = nValue + Params().GetConsensus().ZC_MinMintFee * txNew.vout.size();
 
     CAmount nValueIn = 0;
     std::set<std::pair<const CWalletTx*, unsigned int> > setCoins;
@@ -335,7 +337,7 @@ bool CWallet::MintsToInputVectorPublicSpend(std::map<CBigNum, CZerocoinMint>& ma
         for (unsigned long i = 0; i < txMint.vout.size(); ++i) {
             CTxOut out = txMint.vout[i];
             if (out.scriptPubKey.IsZerocoinMint()){
-                libzerocoin::PublicCoin pubcoin(Params().Zerocoin_Params(false));
+                libzerocoin::PublicCoin pubcoin(Params().GetConsensus().Zerocoin_Params(false));
                 CValidationState state;
                 if (!TxOutToPublicCoin(out, pubcoin, state))
                     return error("%s: extracting pubcoin from txout failed", __func__);
@@ -398,7 +400,7 @@ bool CWallet::CreateZCPublicSpendTransaction(
     CAmount nValueSelected = 0;
     int nCoinsReturned = 0; // Number of coins returned in change from function below (for debug)
     int nNeededSpends = 0;  // Number of spends which would be needed if selection failed
-    const int nMaxSpends = Params().Zerocoin_MaxPublicSpendsPerTransaction(); // Maximum possible spends for one zPIV public spend transaction
+    const int nMaxSpends = Params().GetConsensus().ZC_MaxPublicSpendsPerTx; // Maximum possible spends for one zPIV public spend transaction
     std::vector<CMintMeta> vMintsToFetch;
     if (vSelectedMints.empty()) {
         //  All of the zPIV used in the public coin spend are mature by default (everything is public now.. no need to wait for any accumulation)

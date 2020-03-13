@@ -216,6 +216,8 @@ extern UniValue delegatestake(const UniValue& params, bool fHelp); // in rpcwall
 extern UniValue rawdelegatestake(const UniValue& params, bool fHelp);
 extern UniValue delegatoradd(const UniValue& params, bool fHelp);
 extern UniValue delegatorremove(const UniValue& params, bool fHelp);
+extern UniValue sethdseed(const UniValue& params, bool fHelp);
+extern UniValue getaddressinfo(const UniValue& params, bool fHelp);
 extern UniValue getnewaddress(const UniValue& params, bool fHelp);
 extern UniValue getnewstakingaddress(const UniValue& params, bool fHelp);
 extern UniValue getaccountaddress(const UniValue& params, bool fHelp);
@@ -256,7 +258,6 @@ extern UniValue encryptwallet(const UniValue& params, bool fHelp);
 extern UniValue getwalletinfo(const UniValue& params, bool fHelp);
 extern UniValue getblockchaininfo(const UniValue& params, bool fHelp);
 extern UniValue getnetworkinfo(const UniValue& params, bool fHelp);
-extern UniValue reservebalance(const UniValue& params, bool fHelp);
 extern UniValue setstakesplitthreshold(const UniValue& params, bool fHelp);
 extern UniValue getstakesplitthreshold(const UniValue& params, bool fHelp);
 extern UniValue multisend(const UniValue& params, bool fHelp);
@@ -314,7 +315,6 @@ extern UniValue getchaintips(const UniValue& params, bool fHelp);
 extern UniValue invalidateblock(const UniValue& params, bool fHelp);
 extern UniValue reconsiderblock(const UniValue& params, bool fHelp);
 extern UniValue getblockindexstats(const UniValue& params, bool fHelp);
-extern UniValue getmintsinblocks(const UniValue& params, bool fHelp);
 extern UniValue getserials(const UniValue& params, bool fHelp);
 extern void validaterange(const UniValue& params, int& heightStart, int& heightEnd, int minHeightStart=1);
 

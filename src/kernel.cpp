@@ -29,7 +29,7 @@ bool GetHashProofOfStake(const CBlockIndex* pindexPrev, CStakeInput* stake, cons
     CDataStream modifier_ss(SER_GETHASH, 0);
 
     // Hash the modifier
-    if (!Params().IsStakeModifierV2(pindexPrev->nHeight + 1)) {
+    if (!Params().GetConsensus().IsStakeModifierV2(pindexPrev->nHeight + 1)) {
         // Modifier v1
         uint64_t nStakeModifier = 0;
         if (!GetOldStakeModifier(stake, nStakeModifier))
@@ -37,7 +37,7 @@ bool GetHashProofOfStake(const CBlockIndex* pindexPrev, CStakeInput* stake, cons
         modifier_ss << nStakeModifier;
     } else {
         // Modifier v2
-        modifier_ss << pindexPrev->nStakeModifierV2;
+        modifier_ss << pindexPrev->GetStakeModifierV2();
     }
 
     CDataStream ss(modifier_ss);
@@ -104,10 +104,11 @@ bool CheckProofOfStake(const CBlock& block, uint256& hashProofOfStake, std::uniq
     unsigned int nBlockFromTime = pindexfrom->nTime;
     unsigned int nTxTime = block.nTime;
     const int nBlockFromHeight = pindexfrom->nHeight;
+    const Consensus::Params& consensus = Params().GetConsensus();
 
-    if (!txin.IsZerocoinSpend() && nPreviousBlockHeight >= Params().Zerocoin_Block_Public_Spend_Enabled() - 1) {
+    if (!txin.IsZerocoinSpend() && nPreviousBlockHeight >= consensus.height_start_ZC_PublicSpends - 1) {
         //check for maturity (min age/depth) requirements
-        if (!Params().HasStakeMinAgeOrDepth(nPreviousBlockHeight+1, nTxTime, nBlockFromHeight, nBlockFromTime))
+        if (!consensus.HasStakeMinAgeOrDepth(nPreviousBlockHeight+1, nTxTime, nBlockFromHeight, nBlockFromTime))
             return error("%s : min age violation - height=%d - nTimeTx=%d, nTimeBlockFrom=%d, nHeightBlockFrom=%d",
                              __func__, nPreviousBlockHeight, nTxTime, nBlockFromTime, nBlockFromHeight);
     }
@@ -137,14 +138,14 @@ bool initStakeInput(const CBlock& block, std::unique_ptr<CStakeInput>& stake, in
         stake = std::unique_ptr<CStakeInput>(new CLegacyZPivStake(spend));
 
         // zPoS contextual checks
+        const Consensus::Params& consensus = Params().GetConsensus();
         /* Only for IBD (between Zerocoin_Block_V2_Start and Zerocoin_Block_Last_Checkpoint) */
-        if (nPreviousBlockHeight < Params().Zerocoin_Block_V2_Start() ||
-                nPreviousBlockHeight > Params().Zerocoin_Block_Last_Checkpoint())
+        if (nPreviousBlockHeight < consensus.height_start_ZC_SerialsV2 || nPreviousBlockHeight > consensus.height_last_ZC_AccumCheckpoint)
             return error("%s : zPIV stake block: height %d outside range", __func__, (nPreviousBlockHeight+1));
         CLegacyZPivStake* zPIV = dynamic_cast<CLegacyZPivStake*>(stake.get());
         if (!zPIV) return error("%s : dynamic_cast of stake ptr failed", __func__);
         // The checkpoint needs to be from 200 blocks ago
-        const int cpHeight = nPreviousBlockHeight - Params().Zerocoin_RequiredStakeDepth();
+        const int cpHeight = nPreviousBlockHeight - consensus.ZC_MinStakeDepth;
         const libzerocoin::CoinDenomination denom = libzerocoin::AmountToZerocoinDenomination(zPIV->GetValue());
         if (ParseAccChecksum(chainActive[cpHeight]->nAccumulatorCheckpoint, denom) != zPIV->GetChecksum())
             return error("%s : accum. checksum at height %d is wrong.", __func__, (nPreviousBlockHeight+1));
@@ -181,18 +182,16 @@ bool initStakeInput(const CBlock& block, std::unique_ptr<CStakeInput>& stake, in
 uint256 ComputeStakeModifier(const CBlockIndex* pindexPrev, const uint256& kernel)
 {
     // genesis block's modifier is 0
-    // all block's modifiers are 0 on regtest
-    if (!pindexPrev || Params().IsRegTestNet())
-        return uint256();
+    if (!pindexPrev) return uint256();
 
     CHashWriter ss(SER_GETHASH, 0);
     ss << kernel;
 
     // switch with old modifier on upgrade block
-    if (!Params().IsStakeModifierV2(pindexPrev->nHeight + 1))
-        ss << pindexPrev->nStakeModifier;
+    if (!Params().GetConsensus().IsStakeModifierV2(pindexPrev->nHeight + 1))
+        ss << pindexPrev->GetStakeModifierV1();
     else
-        ss << pindexPrev->nStakeModifierV2;
+        ss << pindexPrev->GetStakeModifierV2();
 
     return ss.GetHash();
 }
@@ -206,12 +205,13 @@ bool Stake(const CBlockIndex* pindexPrev, CStakeInput* stakeInput, unsigned int 
 
     // check required min depth for stake
     const int nHeightBlockFrom = pindexFrom->nHeight;
-    if (nHeight < nHeightBlockFrom + Params().COINSTAKE_MIN_DEPTH())
+    if (nHeight < nHeightBlockFrom + Params().GetConsensus().nStakeMinDepth)
         return error("%s : min depth violation, nHeight=%d, nHeightBlockFrom=%d", __func__, nHeight, nHeightBlockFrom);
 
-    nTimeTx = (Params().IsRegTestNet() ? GetAdjustedTime() : GetCurrentTimeSlot());
+    const bool fRegTest = Params().IsRegTestNet();
+    nTimeTx = (fRegTest ? GetAdjustedTime() : GetCurrentTimeSlot());
     // double check that we are not on the same slot as prev block
-    if (nTimeTx <= pindexPrev->nTime) return false;
+    if (nTimeTx <= pindexPrev->nTime && !fRegTest) return false;
 
     // check stake kernel
     return CheckStakeKernelHash(pindexPrev, nBits, stakeInput, nTimeTx, hashProofOfStake);
@@ -225,7 +225,7 @@ bool Stake(const CBlockIndex* pindexPrev, CStakeInput* stakeInput, unsigned int 
 // Timestamp for time protocol V2: slot duration 15 seconds
 int64_t GetTimeSlot(const int64_t nTime)
 {
-    const int slotLen = Params().TimeSlotLength();
+    const int slotLen = Params().GetConsensus().nTimeSlotLength;
     return (nTime / slotLen) * slotLen;
 }
 
@@ -250,9 +250,6 @@ static const unsigned int MODIFIER_INTERVAL = 60;
 static const int MODIFIER_INTERVAL_RATIO = 3;
 static const int64_t OLD_MODIFIER_INTERVAL = 2087;
 
-// Hard checkpoints of stake modifiers to ensure they are deterministic
-static std::map<int, unsigned int> mapStakeModifierCheckpoints =
-    boost::assign::map_list_of(0, 0xfd11f4e7u);
 
 // Get selection interval section (in seconds)
 static int64_t GetStakeModifierSelectionIntervalSection(int nSection)
@@ -287,7 +284,7 @@ static bool SelectBlockFromCandidates(
 
         //if the lowest block height (vSortedByTimestamp[0]) is >= switch height, use new modifier calc
         if (fFirstRun){
-            fModifierV2 = pindex->nHeight >= Params().ModifierUpgradeBlock();
+            fModifierV2 = pindex->nHeight >= Params().GetConsensus().height_start_StakeModifierNewSelection;
             fFirstRun = false;
         }
 
@@ -325,19 +322,6 @@ static bool SelectBlockFromCandidates(
     return fSelected;
 }
 
-unsigned int GetStakeModifierChecksum(const CBlockIndex* pindex)
-{
-    assert(pindex->pprev || pindex->GetBlockHash() == Params().HashGenesisBlock());
-    // Hash previous checksum with flags, hashProofOfStake and nStakeModifier
-    CDataStream ss(SER_GETHASH, 0);
-    if (pindex->pprev)
-        ss << pindex->pprev->nStakeModifierChecksum;
-    ss << pindex->nFlags << pindex->hashProofOfStake << pindex->nStakeModifier;
-    uint256 hashChecksum = Hash(ss.begin(), ss.end());
-    hashChecksum >>= (256 - 32);
-    return hashChecksum.Get64();
-}
-
 bool GetOldStakeModifier(CStakeInput* stake, uint64_t& nStakeModifier)
 {
     if(Params().IsRegTestNet()) {
@@ -348,7 +332,7 @@ bool GetOldStakeModifier(CStakeInput* stake, uint64_t& nStakeModifier)
     if (!pindexFrom) return error("%s : failed to get index from", __func__);
     if (stake->IsZPIV()) {
         int64_t nTimeBlockFrom = pindexFrom->GetBlockTime();
-        const int nHeightStop = std::min(chainActive.Height(), Params().Zerocoin_Block_Last_Checkpoint()-1);
+        const int nHeightStop = std::min(chainActive.Height(), Params().GetConsensus().height_last_ZC_AccumCheckpoint-1);
         while (pindexFrom && pindexFrom->nHeight + 1 <= nHeightStop) {
             if (pindexFrom->GetBlockTime() - nTimeBlockFrom > 60 * 60) {
                 nStakeModifier = pindexFrom->nAccumulatorCheckpoint.Get64();
@@ -372,11 +356,6 @@ bool GetOldModifier(const uint256& hashBlockFrom, uint64_t& nStakeModifier)
         return error("%s : block not indexed", __func__);
     const CBlockIndex* pindexFrom = mapBlockIndex[hashBlockFrom];
     int64_t nStakeModifierTime = pindexFrom->GetBlockTime();
-    // Fixed stake modifier only for regtest
-    if (Params().IsRegTestNet()) {
-        nStakeModifier = pindexFrom->nStakeModifier;
-        return true;
-    }
     const CBlockIndex* pindex = pindexFrom;
     CBlockIndex* pindexNext = chainActive[pindex->nHeight + 1];
 
@@ -391,7 +370,7 @@ bool GetOldModifier(const uint256& hashBlockFrom, uint64_t& nStakeModifier)
         pindexNext = chainActive[pindex->nHeight + 1];
     } while (nStakeModifierTime < pindexFrom->GetBlockTime() + OLD_MODIFIER_INTERVAL);
 
-    nStakeModifier = pindex->nStakeModifier;
+    nStakeModifier = pindex->GetStakeModifierV1();
     return true;
 }
 
@@ -413,10 +392,6 @@ bool ComputeNextStakeModifier(const CBlockIndex* pindexPrev, uint64_t& nStakeMod
     nStakeModifier = 0;
     fGeneratedStakeModifier = false;
 
-    // modifier 0 on RegTest
-    if (Params().IsRegTestNet()) {
-        return true;
-    }
     if (!pindexPrev) {
         fGeneratedStakeModifier = true;
         return true; // genesis block's modifier is 0
@@ -434,7 +409,7 @@ bool ComputeNextStakeModifier(const CBlockIndex* pindexPrev, uint64_t& nStakeMod
     const CBlockIndex* p = pindexPrev;
     while (p && p->pprev && !p->GeneratedStakeModifier()) p = p->pprev;
     if (!p->GeneratedStakeModifier()) return error("%s : unable to get last modifier", __func__);
-    nStakeModifier = p->nStakeModifier;
+    nStakeModifier = p->GetStakeModifierV1();
     nModifierTime = p->GetBlockTime();
 
     if (GetBoolArg("-printstakemodifier", false))
@@ -445,7 +420,7 @@ bool ComputeNextStakeModifier(const CBlockIndex* pindexPrev, uint64_t& nStakeMod
 
     // Sort candidate blocks by timestamp
     std::vector<std::pair<int64_t, uint256> > vSortedByTimestamp;
-    vSortedByTimestamp.reserve(64 * MODIFIER_INTERVAL  / Params().TargetSpacing());
+    vSortedByTimestamp.reserve(64 * MODIFIER_INTERVAL  / Params().GetConsensus().nTargetSpacing);
     int64_t nSelectionIntervalStart = (pindexPrev->GetBlockTime() / MODIFIER_INTERVAL ) * MODIFIER_INTERVAL  - OLD_MODIFIER_INTERVAL;
     const CBlockIndex* pindex = pindexPrev;
 

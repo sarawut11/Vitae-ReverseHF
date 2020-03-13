@@ -92,14 +92,10 @@ public:
 
 void UpdateTime(CBlockHeader* pblock, const CBlockIndex* pindexPrev)
 {
-    if (Params().IsTimeProtocolV2(pindexPrev->nHeight+1)) {
-        pblock->nTime = GetCurrentTimeSlot();
-    } else {
-        pblock->nTime = std::max(pindexPrev->GetMedianTimePast() + 1, GetAdjustedTime());
-    }
+    pblock->nTime = std::max(pindexPrev->GetMedianTimePast() + 1, GetAdjustedTime());
 
     // Updating time can change work required on testnet:
-    if (Params().AllowMinDifficultyBlocks())
+    if (Params().GetConsensus().fPowAllowMinDifficultyBlocks)
         pblock->nBits = GetNextWorkRequired(pindexPrev, pblock);
 }
 
@@ -129,18 +125,14 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn, CWallet* pwallet, 
     if (!pindexPrev) return nullptr;
     const int nHeight = pindexPrev->nHeight + 1;
 
-    // Make sure to create the correct block version after zerocoin is enabled
-    bool fZerocoinActive = nHeight >= Params().Zerocoin_StartHeight();
-    if(Params().Block_V7_StartHeight()) {
-        pblock->nVersion = 7;       //!> Supports V2 Stake Modifiers and blockheaders without accumlatorcheckpoint/zc stuff
-    } else {
-        pblock->nVersion = 6;       //!> Supports CLTV activation
-    }
+    // Make sure to create the correct block version
+    const Consensus::Params& consensus = Params().GetConsensus();
+    pblock->nVersion = 7;       //!> Removes accumulator checkpoints
 
     // -regtest only: allow overriding block.nVersion with
     // -blockversion=N to test forking scenarios
-    if (Params().MineBlocksOnDemand()) {
-        if (nHeight < Params().Zerocoin_StartHeight()) pblock->nVersion = 3;
+    if (Params().IsRegTestNet()) {
+        if (nHeight < consensus.height_start_ZC) pblock->nVersion = 3;
         pblock->nVersion = GetArg("-blockversion", pblock->nVersion);
     }
 
@@ -214,37 +206,11 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn, CWallet* pwallet, 
             double dPriority = 0;
             CAmount nTotalIn = 0;
             bool fMissingInputs = false;
-            uint256 txid = tx.GetHash();
             bool hasZerocoinSpends = tx.HasZerocoinSpendInputs();
             if (hasZerocoinSpends)
                 nTotalIn = tx.GetZerocoinSpent();
 
             for (const CTxIn& txin : tx.vin) {
-                //zerocoinspend has special vin
-                if (hasZerocoinSpends) {
-                    //Give a high priority to zerocoinspends to get into the next block
-                    //Priority = (age^6+100000)*amount - gives higher priority to zpivs that have been in mempool long
-                    //and higher priority to zpivs that are large in value
-                    int64_t nTimeSeen = GetAdjustedTime();
-                    double nConfs = 100000;
-
-                    auto it = mapZerocoinspends.find(txid);
-                    if (it != mapZerocoinspends.end()) {
-                        nTimeSeen = it->second;
-                    } else {
-                        //for some reason not in map, add it
-                        mapZerocoinspends[txid] = nTimeSeen;
-                    }
-
-                    double nTimePriority = std::pow(GetAdjustedTime() - nTimeSeen, 6);
-
-                    // zPIV spends can have very large priority, use non-overflowing safe functions
-                    dPriority = double_safe_addition(dPriority, (nTimePriority * nConfs));
-                    dPriority = double_safe_multiplication(dPriority, nTotalIn);
-
-                    continue;
-                }
-
                 // Read prev transaction
                 if (!view.HaveCoins(txin.prevout.hash)) {
                     // This should never happen; all transactions in the memory
@@ -371,7 +337,7 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn, CWallet* pwallet, 
                     if (txIn.IsZerocoinSpend() || isPublicSpend) {
                         libzerocoin::CoinSpend* spend;
                         if (isPublicSpend) {
-                            libzerocoin::ZerocoinParams* params = Params().Zerocoin_Params(false);
+                            libzerocoin::ZerocoinParams* params = consensus.Zerocoin_Params(false);
                             PublicCoinSpend publicSpend(params);
                             CValidationState state;
                             if (!ZPIVModule::ParseZerocoinPublicSpend(txIn, tx, state, publicSpend)){
@@ -384,7 +350,7 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn, CWallet* pwallet, 
                         }
 
                         bool fUseV1Params = spend->getCoinVersion() < libzerocoin::PrivateCoin::PUBKEY_VERSION;
-                        if (!spend->HasValidSerial(Params().Zerocoin_Params(fUseV1Params)))
+                        if (!spend->HasValidSerial(consensus.Zerocoin_Params(fUseV1Params)))
                             fDoubleSerial = true;
                         if (std::count(vBlockSerials.begin(), vBlockSerials.end(), spend->getCoinSerialNumber()))
                             fDoubleSerial = true;
@@ -536,14 +502,13 @@ CBlockTemplate* CreateNewBlockWithKey(CReserveKey& reservekey, CWallet* pwallet)
         return nullptr;
 
     const int nHeightNext = chainActive.Tip()->nHeight + 1;
-    static int nLastPOWBlock = Params().LAST_POW_BLOCK();
 
     // If we're building a late PoW block, don't continue
     // PoS blocks are built directly with CreateNewBlock
-    if ((nHeightNext > nLastPOWBlock)) {
+    if ((nHeightNext > Params().GetConsensus().height_last_PoW)) {
         LogPrintf("%s: Aborting PoW block creation during PoS phase\n", __func__);
         // sleep 1/2 a block time so we don't go into a tight loop.
-        MilliSleep((Params().TargetSpacing() * 1000) >> 1);
+        MilliSleep((Params().GetConsensus().nTargetSpacing * 1000) >> 1);
         return nullptr;
     }
 
@@ -558,7 +523,7 @@ bool ProcessBlockFound(CBlock* pblock, CWallet& wallet, CReserveKey& reservekey)
 
     // Found a solution
     {
-        WaitableLock lock(g_best_block_mutex);
+        WAIT_LOCK(g_best_block_mutex, lock);
         if (pblock->hashPrevBlock != g_best_block)
             return error("PIVXMiner : generated block is stale");
     }
@@ -606,7 +571,9 @@ void BitcoinMiner(CWallet* pwallet, bool fProofOfStake)
 {
     LogPrintf("PIVXMiner started\n");
     SetThreadPriority(THREAD_PRIORITY_LOWEST);
-    RenameThread("pivx-miner");
+    util::ThreadRename("pivx-miner");
+    const int64_t nSpacingMillis = Params().GetConsensus().nTargetSpacing * 1000;
+    const int last_pow_block = Params().GetConsensus().height_last_PoW;
 
     // Each thread has its own key and counter
     CReserveKey reservekey(pwallet);
@@ -615,20 +582,20 @@ void BitcoinMiner(CWallet* pwallet, bool fProofOfStake)
     while (fGenerateBitcoins || fProofOfStake) {
         CBlockIndex* pindexPrev = GetChainTip();
         if (!pindexPrev) {
-            MilliSleep(Params().TargetSpacing() * 1000);       // sleep a block
+            MilliSleep(nSpacingMillis);       // sleep a block
             continue;
         }
         if (fProofOfStake) {
-            if (pindexPrev->nHeight < Params().LAST_POW_BLOCK()) {
+            if (pindexPrev->nHeight < last_pow_block) {
                 // The last PoW block hasn't even been mined yet.
-                MilliSleep(Params().TargetSpacing() * 1000);       // sleep a block
+                MilliSleep(nSpacingMillis);       // sleep a block
                 continue;
             }
 
             // update fStakeableCoins (5 minute check time);
             CheckForCoins(pwallet, 5);
 
-            while (vNodes.empty() || pwallet->IsLocked() || !fStakeableCoins ||
+            while ((vNodes.empty() && Params().MiningRequiresPeers()) || pwallet->IsLocked() || !fStakeableCoins ||
                     masternodeSync.NotCompleted()) {
                 MilliSleep(5000);
                 // Do a separate 1 minute check here to ensure fStakeableCoins is updated
@@ -643,7 +610,7 @@ void BitcoinMiner(CWallet* pwallet, bool fProofOfStake)
                 continue;
             }
 
-        } else if ((pindexPrev->nHeight - 6) > Params().LAST_POW_BLOCK()) {
+        } else if ((pindexPrev->nHeight - 6) > last_pow_block) {
             // Late PoW: run for a little while longer, just in case there is a rewind on the chain.
             LogPrintf("%s: Exiting PoW Mining Thread at height: %d\n", __func__, pindexPrev->nHeight);
             return;
@@ -699,7 +666,7 @@ void BitcoinMiner(CWallet* pwallet, bool fProofOfStake)
 
                     // In regression test mode, stop mining after a block is found. This
                     // allows developers to controllably generate a block on demand.
-                    if (Params().MineBlocksOnDemand())
+                    if (Params().IsRegTestNet())
                         throw boost::thread_interrupted();
 
                     break;
@@ -718,7 +685,7 @@ void BitcoinMiner(CWallet* pwallet, bool fProofOfStake)
             } else
                 nHashCounter += nHashesDone;
             if (GetTimeMillis() - nHPSTimerStart > 4000) {
-                static CCriticalSection cs;
+                static RecursiveMutex cs;
                 {
                     LOCK(cs);
                     if (GetTimeMillis() - nHPSTimerStart > 4000) {
@@ -744,10 +711,11 @@ void BitcoinMiner(CWallet* pwallet, bool fProofOfStake)
 
             // Update nTime every few seconds
             UpdateTime(pblock, pindexPrev);
-            if (Params().AllowMinDifficultyBlocks()) {
+            if (Params().GetConsensus().fPowAllowMinDifficultyBlocks) {
                 // Changing pblock->nTime can change work required on testnet:
                 hashTarget.SetCompact(pblock->nBits);
             }
+
         }
     }
 }
@@ -772,14 +740,6 @@ void GenerateBitcoins(bool fGenerate, CWallet* pwallet, int nThreads)
 {
     static boost::thread_group* minerThreads = NULL;
     fGenerateBitcoins = fGenerate;
-
-    if (nThreads < 0) {
-        // In regtest threads defaults to 1
-        if (Params().DefaultMinerThreads())
-            nThreads = Params().DefaultMinerThreads();
-        else
-            nThreads = boost::thread::hardware_concurrency();
-    }
 
     if (minerThreads != NULL) {
         minerThreads->interrupt_all();

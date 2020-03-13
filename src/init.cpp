@@ -19,6 +19,7 @@
 #include "amount.h"
 #include "checkpoints.h"
 #include "compat/sanity.h"
+#include "consensus/zerocoin_verify.h"
 #include "httpserver.h"
 #include "httprpc.h"
 #include "invalid.h"
@@ -41,6 +42,7 @@
 #include "guiinterface.h"
 #include "util.h"
 #include "utilmoneystr.h"
+#include "util/threadnames.h"
 #include "validationinterface.h"
 #include "zpivchain.h"
 
@@ -186,7 +188,7 @@ void PrepareShutdown()
     fRequestShutdown = true;  // Needed when we shutdown the wallet
     fRestartRequested = true; // Needed when we restart the wallet
     LogPrintf("%s: In progress...\n", __func__);
-    static CCriticalSection cs_Shutdown;
+    static RecursiveMutex cs_Shutdown;
     TRY_LOCK(cs_Shutdown, lockShutdown);
     if (!lockShutdown)
         return;
@@ -195,7 +197,7 @@ void PrepareShutdown()
     /// for example if the data directory was found to be locked.
     /// Be sure that anything that writes files or flushes caches only does this if the respective
     /// module was initialized.
-    RenameThread("pivx-shutoff");
+    util::ThreadRename("pivx-shutoff");
     mempool.AddTransactionsUpdated(1);
     StopHTTPRPC();
     StopREST();
@@ -325,7 +327,7 @@ static void registerSignalHandler(int signal, void(*handler)(int))
 
 bool static InitError(const std::string& str)
 {
-    uiInterface.ThreadSafeMessageBox(str, "", CClientUIInterface::MSG_ERROR);
+    uiInterface.ThreadSafeMessageBox(str, "Init Error", CClientUIInterface::MSG_ERROR);
     return false;
 }
 
@@ -396,7 +398,7 @@ std::string HelpMessage(HelpMessageMode mode)
     strUsage += HelpMessageOpt("-datadir=<dir>", _("Specify data directory"));
     strUsage += HelpMessageOpt("-dbcache=<n>", strprintf(_("Set database cache size in megabytes (%d to %d, default: %d)"), nMinDbCache, nMaxDbCache, nDefaultDbCache));
     strUsage += HelpMessageOpt("-loadblock=<file>", _("Imports blocks from external blk000??.dat file") + " " + _("on startup"));
-    strUsage += HelpMessageOpt("-maxreorg=<n>", strprintf(_("Set the Maximum reorg depth (default: %u)"), Params(CBaseChainParams::MAIN).MaxReorganizationDepth()));
+    strUsage += HelpMessageOpt("-maxreorg=<n>", strprintf(_("Set the Maximum reorg depth (default: %u)"), DEFAULT_MAX_REORG_DEPTH));
     strUsage += HelpMessageOpt("-maxorphantx=<n>", strprintf(_("Keep at most <n> unconnectable transactions in memory (default: %u)"), DEFAULT_MAX_ORPHAN_TRANSACTIONS));
     strUsage += HelpMessageOpt("-par=<n>", strprintf(_("Set the number of script verification threads (%u to %d, 0 = auto, <0 = leave that many cores free, default: %d)"), -(int)boost::thread::hardware_concurrency(), MAX_SCRIPTCHECK_THREADS, DEFAULT_SCRIPTCHECK_THREADS));
 #ifndef WIN32
@@ -639,6 +641,26 @@ static void BlockSizeNotifyCallback(int size, const uint256& hashNewTip)
     boost::thread t(runCommand, strCmd); // thread runs free
 }
 
+////////////////////////////////////////////////////
+
+static bool fHaveGenesis = false;
+static std::mutex cs_GenesisWait;
+static std::condition_variable condvar_GenesisWait;
+
+static void BlockNotifyGenesisWait(bool, const CBlockIndex *pBlockIndex)
+{
+    if (pBlockIndex != nullptr) {
+        {
+            std::unique_lock<std::mutex> lock_GenesisWait(cs_GenesisWait);
+            fHaveGenesis = true;
+        }
+        condvar_GenesisWait.notify_all();
+    }
+}
+
+////////////////////////////////////////////////////
+
+
 struct CImportingNow {
     CImportingNow()
     {
@@ -655,7 +677,7 @@ struct CImportingNow {
 
 void ThreadImport(std::vector<boost::filesystem::path> vImportFiles)
 {
-    RenameThread("pivx-loadblk");
+    util::ThreadRename("pivx-loadblk");
 
     // -reindex
     if (fReindex) {
@@ -820,34 +842,22 @@ bool AppInitBasicSetup()
     return true;
 }
 
-/** Initialize pivx.
- *  @pre Parameters should be parsed and config file should be read.
- */
-bool AppInit2()
+// Parameter interaction based on rules
+void InitParameterInteraction()
 {
-    // ********************************************************* Step 1: setup
-    if (!AppInitBasicSetup())
-        return false;
-
-    // ********************************************************* Step 2: parameter interactions
-    // Set this early so that parameter interactions go to console
-    fPrintToConsole = GetBoolArg("-printtoconsole", false);
-    fLogTimestamps = GetBoolArg("-logtimestamps", true);
-    fLogIPs = GetBoolArg("-logips", false);
-
     if (mapArgs.count("-bind") || mapArgs.count("-whitebind")) {
         // when specifying an explicit binding address, you want to listen on it
         // even when -connect or -proxy is specified
         if (SoftSetBoolArg("-listen", true))
-            LogPrintf("AppInit2 : parameter interaction: -bind or -whitebind set -> setting -listen=1\n");
+            LogPrintf("%s : parameter interaction: -bind or -whitebind set -> setting -listen=1\n", __func__);
     }
 
     if (mapArgs.count("-connect") && mapMultiArgs["-connect"].size() > 0) {
         // when only connecting to trusted nodes, do not seed via DNS, or listen by default
         if (SoftSetBoolArg("-dnsseed", false))
-            LogPrintf("AppInit2 : parameter interaction: -connect set -> setting -dnsseed=0\n");
+            LogPrintf("%s : parameter interaction: -connect set -> setting -dnsseed=0\n", __func__);
         if (SoftSetBoolArg("-listen", false))
-            LogPrintf("AppInit2 : parameter interaction: -connect set -> setting -listen=0\n");
+            LogPrintf("%s : parameter interaction: -connect set -> setting -listen=0\n", __func__);
     }
 
     if (mapArgs.count("-proxy")) {
@@ -860,49 +870,73 @@ bool AppInit2()
             LogPrintf("%s: parameter interaction: -proxy set -> setting -upnp=0\n", __func__);
         // to protect privacy, do not discover addresses by default
         if (SoftSetBoolArg("-discover", false))
-            LogPrintf("AppInit2 : parameter interaction: -proxy set -> setting -discover=0\n");
+            LogPrintf("%s : parameter interaction: -proxy set -> setting -discover=0\n", __func__);
     }
 
     if (!GetBoolArg("-listen", true)) {
         // do not map ports or try to retrieve public IP when not listening (pointless)
         if (SoftSetBoolArg("-upnp", false))
-            LogPrintf("AppInit2 : parameter interaction: -listen=0 -> setting -upnp=0\n");
+            LogPrintf("%s : parameter interaction: -listen=0 -> setting -upnp=0\n", __func__);
         if (SoftSetBoolArg("-discover", false))
-            LogPrintf("AppInit2 : parameter interaction: -listen=0 -> setting -discover=0\n");
+            LogPrintf("%s : parameter interaction: -listen=0 -> setting -discover=0\n", __func__);
         if (SoftSetBoolArg("-listenonion", false))
-            LogPrintf("AppInit2 : parameter interaction: -listen=0 -> setting -listenonion=0\n");
+            LogPrintf("%s : parameter interaction: -listen=0 -> setting -listenonion=0\n", __func__);
     }
 
     if (mapArgs.count("-externalip")) {
         // if an explicit public IP is specified, do not try to find others
         if (SoftSetBoolArg("-discover", false))
-            LogPrintf("AppInit2 : parameter interaction: -externalip set -> setting -discover=0\n");
+            LogPrintf("%s : parameter interaction: -externalip set -> setting -discover=0\n", __func__);
     }
 
     if (GetBoolArg("-salvagewallet", false)) {
         // Rewrite just private keys: rescan to find transactions
         if (SoftSetBoolArg("-rescan", true))
-            LogPrintf("AppInit2 : parameter interaction: -salvagewallet=1 -> setting -rescan=1\n");
+            LogPrintf("%s : parameter interaction: -salvagewallet=1 -> setting -rescan=1\n", __func__);
     }
 
     // -zapwallettx implies a rescan
     if (GetBoolArg("-zapwallettxes", false)) {
         if (SoftSetBoolArg("-rescan", true))
-            LogPrintf("AppInit2 : parameter interaction: -zapwallettxes=<mode> -> setting -rescan=1\n");
+            LogPrintf("%s : parameter interaction: -zapwallettxes=<mode> -> setting -rescan=1\n", __func__);
     }
 
     if (!GetBoolArg("-enableswifttx", fEnableSwiftTX)) {
         if (SoftSetArg("-swifttxdepth", "0"))
-            LogPrintf("AppInit2 : parameter interaction: -enableswifttx=false -> setting -nSwiftTXDepth=0\n");
+            LogPrintf("%s : parameter interaction: -enableswifttx=false -> setting -nSwiftTXDepth=0\n", __func__);
     }
+}
 
-    if (mapArgs.count("-reservebalance")) {
-        if (!ParseMoney(mapArgs["-reservebalance"], nReserveBalance)) {
-            InitError(_("Invalid amount for -reservebalance=<amount>"));
-            return false;
-        }
-    }
+static std::string ResolveErrMsg(const char * const optname, const std::string& strBind)
+{
+    return strprintf(_("Cannot resolve -%s address: '%s'"), optname, strBind);
+}
 
+static std::string AmountErrMsg(const char * const optname, const std::string& strValue)
+{
+    return strprintf(_("Invalid amount for -%s=<amount>: '%s'"), optname, strValue);
+}
+
+void InitLogging()
+{
+    fPrintToConsole = GetBoolArg("-printtoconsole", false);
+    fLogTimestamps = GetBoolArg("-logtimestamps", true);
+    fLogIPs = GetBoolArg("-logips", false);
+
+    LogPrintf("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
+    LogPrintf("PIVX version %s (%s)\n", FormatFullVersion(), CLIENT_DATE);
+}
+
+/** Initialize pivx.
+ *  @pre Parameters should be parsed and config file should be read.
+ */
+bool AppInit2()
+{
+    // ********************************************************* Step 1: setup
+    if (!AppInitBasicSetup())
+        return false;
+
+    // ********************************************************* Step 2: parameter interactions
     // Make sure enough file descriptors are available
     int nBind = std::max((int)mapArgs.count("-bind") + (int)mapArgs.count("-whitebind"), 1);
     nMaxConnections = GetArg("-maxconnections", 125);
@@ -979,7 +1013,7 @@ bool AppInit2()
         if (ParseMoney(mapArgs["-minrelaytxfee"], n) && n > 0)
             ::minRelayTxFee = CFeeRate(n);
         else
-            return InitError(strprintf(_("Invalid amount for -minrelaytxfee=<amount>: '%s'"), mapArgs["-minrelaytxfee"]));
+            return InitError(AmountErrMsg("minrelaytxfee", mapArgs["-minrelaytxfee"]));
     }
 
 #ifdef ENABLE_WALLET
@@ -988,12 +1022,12 @@ bool AppInit2()
         if (ParseMoney(mapArgs["-mintxfee"], n) && n > 0)
             CWallet::minTxFee = CFeeRate(n);
         else
-            return InitError(strprintf(_("Invalid amount for -mintxfee=<amount>: '%s'"), mapArgs["-mintxfee"]));
+            return InitError(AmountErrMsg("mintxfee", mapArgs["-mintxfee"]));
     }
     if (mapArgs.count("-paytxfee")) {
         CAmount nFeePerK = 0;
         if (!ParseMoney(mapArgs["-paytxfee"], nFeePerK))
-            return InitError(strprintf(_("Invalid amount for -paytxfee=<amount>: '%s'"), mapArgs["-paytxfee"]));
+            return InitError(AmountErrMsg("paytxfee", mapArgs["-paytxfee"]));
         if (nFeePerK > nHighTransactionFeeWarning)
             InitWarning(_("Warning: -paytxfee is set very high! This is the transaction fee you will pay if you send a transaction."));
         payTxFee = CFeeRate(nFeePerK, 1000);
@@ -1005,7 +1039,7 @@ bool AppInit2()
     if (mapArgs.count("-maxtxfee")) {
         CAmount nMaxFee = 0;
         if (!ParseMoney(mapArgs["-maxtxfee"], nMaxFee))
-            return InitError(strprintf(_("Invalid amount for -maxtxfee=<amount>: '%s'"), mapArgs["-maxtxfee"]));
+            return InitError(AmountErrMsg("maxtxfee", mapArgs["-maxtxfee"]));
         if (nMaxFee > nHighTransactionMaxFeeWarning)
             InitWarning(_("Warning: -maxtxfee is set very high! Fees this large could be paid on a single transaction."));
         maxTxFee = nMaxFee;
@@ -1353,13 +1387,13 @@ bool AppInit2()
             for (std::string strBind : mapMultiArgs["-bind"]) {
                 CService addrBind;
                 if (!Lookup(strBind.c_str(), addrBind, GetListenPort(), false))
-                    return InitError(strprintf(_("Cannot resolve -bind address: '%s'"), strBind));
+                    return InitError(ResolveErrMsg("bind", strBind));
                 fBound |= Bind(addrBind, (BF_EXPLICIT | BF_REPORT_ERROR));
             }
             for (std::string strBind : mapMultiArgs["-whitebind"]) {
                 CService addrBind;
                 if (!Lookup(strBind.c_str(), addrBind, 0, false))
-                    return InitError(strprintf(_("Cannot resolve -whitebind address: '%s'"), strBind));
+                    return InitError(ResolveErrMsg("whitebind", strBind));
                 if (addrBind.GetPort() == 0)
                     return InitError(strprintf(_("Need to specify a port with -whitebind: '%s'"), strBind));
                 fBound |= Bind(addrBind, (BF_EXPLICIT | BF_REPORT_ERROR | BF_WHITELIST));
@@ -1376,10 +1410,11 @@ bool AppInit2()
 
     if (mapArgs.count("-externalip")) {
         for (std::string strAddr : mapMultiArgs["-externalip"]) {
-            CService addrLocal(strAddr, GetListenPort(), fNameLookup);
-            if (!addrLocal.IsValid())
-                return InitError(strprintf(_("Cannot resolve -externalip address: '%s'"), strAddr));
-            AddLocal(CService(strAddr, GetListenPort(), fNameLookup), LOCAL_MANUAL);
+            CService addrLocal;
+            if (Lookup(strAddr.c_str(), addrLocal, GetListenPort(), fNameLookup) && addrLocal.IsValid())
+                AddLocal(addrLocal,LOCAL_MANUAL);
+            else
+                return InitError(ResolveErrMsg("externalip", strAddr));
         }
     }
 
@@ -1462,9 +1497,11 @@ bool AppInit2()
                     break;
                 }
 
+                const Consensus::Params& consensus = Params().GetConsensus();
+
                 // If the loaded chain has a wrong genesis, bail out immediately
                 // (we're likely using a testnet datadir, or the other way around).
-                if (!mapBlockIndex.empty() && mapBlockIndex.count(Params().HashGenesisBlock()) == 0)
+                if (!mapBlockIndex.empty() && mapBlockIndex.count(consensus.hashGenesisBlock) == 0)
                     return InitError(_("Incorrect or no genesis block found. Wrong datadir for network?"));
 
                 // Initialize the block index (no-op if non-empty database was already loaded)
@@ -1485,7 +1522,7 @@ bool AppInit2()
 
                 // Drop all information from the zerocoinDB and repopulate
                 if (GetBoolArg("-reindexzerocoin", false)) {
-                    if (chainActive.Height() > Params().Zerocoin_StartHeight()) {
+                    if (chainActive.Height() > consensus.height_start_ZC) {
                         uiInterface.InitMessage(_("Reindexing zerocoin database..."));
                         std::string strError = ReindexZerocoinDB();
                         if (strError != "") {
@@ -1499,11 +1536,11 @@ bool AppInit2()
                 bool reindexDueWrappedSerials = false;
                 bool reindexZerocoin = false;
                 int chainHeight = chainActive.Height();
-                if(Params().NetworkID() == CBaseChainParams::MAIN && chainHeight > Params().Zerocoin_Block_EndFakeSerial()) {
+                if(Params().NetworkID() == CBaseChainParams::MAIN && chainHeight > consensus.height_last_ZC_WrappedSerials) {
 
                     // Supply needs to be exactly GetSupplyBeforeFakeSerial + GetWrapppedSerialInflationAmount
-                    CBlockIndex* pblockindex = chainActive[Params().Zerocoin_Block_EndFakeSerial() + 1];
-                    CAmount zpivSupplyCheckpoint = Params().GetSupplyBeforeFakeSerial() + GetWrapppedSerialInflationAmount();
+                    CBlockIndex* pblockindex = chainActive[consensus.height_last_ZC_WrappedSerials + 1];
+                    CAmount zpivSupplyCheckpoint = consensus.ZC_WrappedSerialsSupply + GetWrapppedSerialInflationAmount();
 
                     if (pblockindex->GetZerocoinSupply() < zpivSupplyCheckpoint) {
                         // Trigger reindex due wrapping serials
@@ -1521,14 +1558,9 @@ bool AppInit2()
 
                 // Recalculate money supply for blocks that are impacted by accounting issue after zerocoin activation
                 if (GetBoolArg("-reindexmoneysupply", false) || reindexZerocoin) {
-                    if (chainHeight > Params().Zerocoin_StartHeight()) {
-                        RecalculateZPIVMinted();
-                        RecalculateZPIVSpent();
-                    }
                     // Recalculate from the zerocoin activation or from scratch.
-                    RecalculatePIVSupply(reindexZerocoin ? Params().Zerocoin_StartHeight() : 1);
+                    RecalculatePIVSupply((reindexZerocoin ? consensus.height_start_ZC : 1), false);
                 }
-
 
                 if (!fReindex) {
                     uiInterface.InitMessage(_("Verifying blocks..."));
@@ -1649,23 +1681,44 @@ bool AppInit2()
                 strErrors << _("Error loading wallet.dat") << "\n";
         }
 
+        int prev_version = pwalletMain->GetVersion();
         if (GetBoolArg("-upgradewallet", fFirstRun)) {
-            int nMaxVersion = GetArg("-upgradewallet", 0);
-            if (nMaxVersion == 0) // the -upgradewallet without argument case
-            {
-                LogPrintf("Performing wallet upgrade to %i\n", FEATURE_LATEST);
-                nMaxVersion = CLIENT_VERSION;
-                pwalletMain->SetMinVersion(FEATURE_LATEST); // permanently upgrade the wallet immediately
-            } else
-                LogPrintf("Allowing wallet upgrade up to %i\n", nMaxVersion);
-            if (nMaxVersion < pwalletMain->GetVersion())
-                strErrors << _("Cannot downgrade wallet") << "\n";
-            pwalletMain->SetMaxVersion(nMaxVersion);
+
+            if (prev_version <= FEATURE_PRE_PIVX && pwalletMain->IsLocked()) {
+                // Cannot upgrade a locked wallet
+                std::string strProblem = "Cannot upgrade a locked wallet.\n";
+                strErrors << _("Error: ") << strProblem;
+                LogPrintf("%s", strErrors.str());
+                return InitError(strProblem);
+            } else {
+
+                int nMaxVersion = GetArg("-upgradewallet", 0);
+                if (nMaxVersion == 0) // the -upgradewallet without argument case
+                {
+                    LogPrintf("Performing wallet upgrade to %i\n", FEATURE_LATEST);
+                    nMaxVersion = FEATURE_LATEST;
+                    pwalletMain->SetMinVersion(FEATURE_LATEST); // permanently upgrade the wallet immediately
+                } else
+                    LogPrintf("Allowing wallet upgrade up to %i\n", nMaxVersion);
+                if (nMaxVersion < pwalletMain->GetVersion())
+                    strErrors << _("Cannot downgrade wallet") << "\n";
+                pwalletMain->SetMaxVersion(nMaxVersion);
+            }
+        }
+
+        // Upgrade to HD if explicit upgrade was requested.
+        std::string upgradeError;
+        if (!pwalletMain->Upgrade(upgradeError, prev_version)) {
+            strErrors << upgradeError << "\n";
         }
 
         if (fFirstRun) {
-            // Create new keyUser and set as default key
-            CPubKey newDefaultKey;
+            // Create new HD Wallet
+            LogPrintf("Creating HD Wallet\n");
+            // Ensure this wallet.dat can only be opened by clients supporting HD.
+            pwalletMain->SetMinVersion(FEATURE_LATEST);
+            pwalletMain->SetupSPKM();
+
             // Top up the keypool
             if (!pwalletMain->TopUpKeyPool()) {
                 // Error generating keys
@@ -1728,18 +1781,31 @@ bool AppInit2()
         }
         fVerifyingBlocks = false;
 
-        //Inititalize zPIVWallet
-        uiInterface.InitMessage(_("Syncing zPIV wallet..."));
+        if (zwalletMain->GetMasterSeed() != 0) {
+            //Inititalize zPIVWallet
+            uiInterface.InitMessage(_("Syncing zPIV wallet..."));
 
-        //Load zerocoin mint hashes to memory
-        pwalletMain->zpivTracker->Init();
-        zwalletMain->LoadMintPoolFromDB();
-        zwalletMain->SyncWithChain();
+            //Load zerocoin mint hashes to memory
+            pwalletMain->zpivTracker->Init();
+            zwalletMain->LoadMintPoolFromDB();
+            zwalletMain->SyncWithChain();
+        }
     }  // (!fDisableWallet)
 #else  // ENABLE_WALLET
     LogPrintf("No wallet compiled in!\n");
 #endif // !ENABLE_WALLET
     // ********************************************************* Step 9: import blocks
+
+    if (!CheckDiskSpace())
+        return false;
+
+    // Either install a handler to notify us when genesis activates, or set fHaveGenesis directly.
+    // No locking, as this happens before any background thread is started.
+    if (chainActive.Tip() == nullptr) {
+        uiInterface.NotifyBlockTip.connect(BlockNotifyGenesisWait);
+    } else {
+        fHaveGenesis = true;
+    }
 
     if (mapArgs.count("-blocknotify"))
         uiInterface.NotifyBlockTip.connect(BlockNotifyCallback);
@@ -1758,10 +1824,15 @@ bool AppInit2()
             vImportFiles.push_back(strFile);
     }
     threadGroup.create_thread(boost::bind(&ThreadImport, vImportFiles));
-    if (chainActive.Tip() == NULL) {
-        LogPrintf("Waiting for genesis block to be imported...\n");
-        while (!fRequestShutdown && chainActive.Tip() == NULL)
-            MilliSleep(10);
+
+    // Wait for genesis block to be processed
+    LogPrintf("Waiting for genesis block to be imported...\n");
+    {
+        std::unique_lock<std::mutex> lockG(cs_GenesisWait);
+        while (!fHaveGenesis) {
+            condvar_GenesisWait.wait(lockG);
+        }
+        uiInterface.NotifyBlockTip.disconnect(BlockNotifyGenesisWait);
     }
 
     // ********************************************************* Step 10: setup ObfuScation
@@ -1909,9 +1980,6 @@ bool AppInit2()
 
     // ********************************************************* Step 11: start node
 
-    if (!CheckDiskSpace())
-        return false;
-
     if (!strErrors.str().empty())
         return InitError(strErrors.str());
 
@@ -1919,9 +1987,14 @@ bool AppInit2()
     LogPrintf("mapBlockIndex.size() = %u\n", mapBlockIndex.size());
     LogPrintf("chainActive.Height() = %d\n", chainActive.Height());
 #ifdef ENABLE_WALLET
-    LogPrintf("setKeyPool.size() = %u\n", pwalletMain ? pwalletMain->setKeyPool.size() : 0);
-    LogPrintf("mapWallet.size() = %u\n", pwalletMain ? pwalletMain->mapWallet.size() : 0);
-    LogPrintf("mapAddressBook.size() = %u\n", pwalletMain ? pwalletMain->mapAddressBook.size() : 0);
+    {
+        if (pwalletMain) {
+            LOCK(pwalletMain->cs_wallet);
+            LogPrintf("setKeyPool.size() = %u\n", pwalletMain ? pwalletMain->GetKeyPoolSize() : 0);
+            LogPrintf("mapWallet.size() = %u\n", pwalletMain ? pwalletMain->mapWallet.size() : 0);
+            LogPrintf("mapAddressBook.size() = %u\n", pwalletMain ? pwalletMain->mapAddressBook.size() : 0);
+        }
+    }
 #endif
 
     if (GetBoolArg("-listenonion", DEFAULT_LISTEN_ONION))

@@ -159,8 +159,7 @@ bool CWalletDB::WriteOrderPosNext(int64_t nOrderPosNext)
     return Write(std::string("orderposnext"), nOrderPosNext);
 }
 
-// presstab HyperStake
-bool CWalletDB::WriteStakeSplitThreshold(uint64_t nStakeSplitThreshold)
+bool CWalletDB::WriteStakeSplitThreshold(CAmount nStakeSplitThreshold)
 {
     nWalletDBUpdated++;
     return Write(std::string("stakeSplitThreshold"), nStakeSplitThreshold);
@@ -252,6 +251,12 @@ bool CWalletDB::ErasePool(int64_t nPool)
 bool CWalletDB::WriteMinVersion(int nVersion)
 {
     return Write(std::string("minversion"), nVersion);
+}
+
+bool CWalletDB::WriteHDChain(const CHDChain& chain)
+{
+    nWalletDBUpdated++;
+    return Write(std::string("hdchain"), chain);
 }
 
 bool CWalletDB::ReadAccount(const std::string& strAccount, CAccount& account)
@@ -522,7 +527,7 @@ bool ReadKeyValue(CWallet* pwallet, CDataStream& ssKey, CDataStream& ssValue, CW
 
             bool fSkipCheck = false;
 
-            if (hash != 0) {
+            if (!hash.IsNull()) {
                 // hash pubkey/privkey to accelerate wallet load
                 std::vector<unsigned char> vchKey;
                 vchKey.reserve(vchPubKey.size() + pkey.size());
@@ -596,14 +601,7 @@ bool ReadKeyValue(CWallet* pwallet, CDataStream& ssKey, CDataStream& ssValue, CW
             ssKey >> nIndex;
             CKeyPool keypool;
             ssValue >> keypool;
-            pwallet->setKeyPool.insert(nIndex);
-
-            // If no metadata exists yet, create a default with the pool key's
-            // creation time. Note that this may be overwritten by actually
-            // stored metadata for that key later, which is fine.
-            CKeyID keyid = keypool.vchPubKey.GetID();
-            if (pwallet->mapKeyMetadata.count(keyid) == 0)
-                pwallet->mapKeyMetadata[keyid] = CKeyMetadata(keypool.nTime);
+            pwallet->GetScriptPubKeyMan()->LoadKeyPool(nIndex, keypool);
         } else if (strType == "version") {
             ssValue >> wss.nFileVersion;
             if (wss.nFileVersion == 10300)
@@ -619,9 +617,11 @@ bool ReadKeyValue(CWallet* pwallet, CDataStream& ssKey, CDataStream& ssValue, CW
             }
         } else if (strType == "orderposnext") {
             ssValue >> pwallet->nOrderPosNext;
-        } else if (strType == "stakeSplitThreshold") //presstab HyperStake
-        {
+        } else if (strType == "stakeSplitThreshold") {
             ssValue >> pwallet->nStakeSplitThreshold;
+            // originally saved as integer
+            if (pwallet->nStakeSplitThreshold < COIN)
+                pwallet->nStakeSplitThreshold *= COIN;
         } else if (strType == "multisend") //presstab HyperStake
         {
             unsigned int i;
@@ -657,6 +657,10 @@ bool ReadKeyValue(CWallet* pwallet, CDataStream& ssKey, CDataStream& ssValue, CW
                 strErr = "Error reading wallet database: LoadDestData failed";
                 return false;
             }
+        } else if (strType == "hdchain") {
+            CHDChain chain;
+            ssValue >> chain;
+            pwallet->GetScriptPubKeyMan()->SetHDChain(chain, true);
         }
     } catch (...) {
         return false;
@@ -847,7 +851,7 @@ DBErrors CWalletDB::ZapWalletTx(CWallet* pwallet, std::vector<CWalletTx>& vWtx)
 void ThreadFlushWalletDB(const std::string& strFile)
 {
     // Make this thread recognisable as the wallet flushing thread
-    RenameThread("pivx-wallet");
+    util::ThreadRename("pivx-wallet");
 
     static bool fOneThread;
     if (fOneThread)

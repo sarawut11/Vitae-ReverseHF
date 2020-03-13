@@ -64,6 +64,7 @@ BITCOIN_TESTS =\
   test/sighash_tests.cpp \
   test/sigopcount_tests.cpp \
   test/skiplist_tests.cpp \
+  test/sync_tests.cpp \
   test/timedata_tests.cpp \
   test/torcontrol_tests.cpp \
   test/transaction_tests.cpp \
@@ -74,8 +75,7 @@ BITCOIN_TESTS =\
 if ENABLE_WALLET
 BITCOIN_TESTS += \
   test/accounting_tests.cpp \
-  wallet/test/wallet_tests.cpp \
-  test/rpc_wallet_tests.cpp
+  wallet/test/wallet_tests.cpp
 endif
 
 test_test_pivx_SOURCES = $(BITCOIN_TEST_SUITE) $(BITCOIN_TESTS) $(JSON_TEST_FILES) $(RAW_TEST_FILES)

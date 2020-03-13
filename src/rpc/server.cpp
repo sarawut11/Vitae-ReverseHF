@@ -31,7 +31,7 @@
 static bool fRPCRunning = false;
 static bool fRPCInWarmup = true;
 static std::string rpcWarmupStatus("RPC server started");
-static CCriticalSection cs_rpcWarmup;
+static RecursiveMutex cs_rpcWarmup;
 
 /* Timer-creating functions */
 static RPCTimerInterface* timerInterface = NULL;
@@ -117,7 +117,7 @@ CAmount AmountFromValue(const UniValue& value)
     if (dAmount <= 0.0 || dAmount > 21000000.0)
         throw JSONRPCError(RPC_TYPE_ERROR, "Invalid amount");
     CAmount nAmount = roundint64(dAmount * COIN);
-    if (!MoneyRange(nAmount))
+    if (!Params().GetConsensus().MoneyRange(nAmount))
         throw JSONRPCError(RPC_TYPE_ERROR, "Invalid amount");
     return nAmount;
 }
@@ -301,7 +301,6 @@ static const CRPCCommand vRPCCommands[] =
         /* Block chain and UTXO */
         {"blockchain", "findserial", &findserial, true, false, false},
         {"blockchain", "getblockindexstats", &getblockindexstats, true, false, false},
-        {"blockchain", "getmintsinblocks", &getmintsinblocks, true, false, false},
         {"blockchain", "getserials", &getserials, true, false, false},
         {"blockchain", "getblockchaininfo", &getblockchaininfo, true, false, false},
         {"blockchain", "getbestblockhash", &getbestblockhash, true, false, false},
@@ -326,7 +325,6 @@ static const CRPCCommand vRPCCommands[] =
         {"mining", "getnetworkhashps", &getnetworkhashps, true, false, false},
         {"mining", "prioritisetransaction", &prioritisetransaction, true, false, false},
         {"mining", "submitblock", &submitblock, true, true, false},
-        {"mining", "reservebalance", &reservebalance, true, true, false},
 
 #ifdef ENABLE_WALLET
         /* Coin generation */
@@ -406,6 +404,8 @@ static const CRPCCommand vRPCCommands[] =
         {"wallet", "getbalance", &getbalance, false, false, true},
         {"wallet", "getcoldstakingbalance", &getcoldstakingbalance, false, false, true},
         {"wallet", "getdelegatedbalance", &getdelegatedbalance, false, false, true},
+        {"wallet", "sethdseed", &sethdseed, true, false, true},
+        {"wallet", "getaddressinfo", &getaddressinfo, true, false, true},
         {"wallet", "getnewaddress", &getnewaddress, true, false, true},
         {"wallet", "getnewstakingaddress", &getnewstakingaddress, true, false, true},
         {"wallet", "getrawchangeaddress", &getrawchangeaddress, true, false, true},

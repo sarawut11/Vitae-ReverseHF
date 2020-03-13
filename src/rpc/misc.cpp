@@ -134,7 +134,7 @@ UniValue getinfo(const UniValue& params, bool fHelp)
     obj.push_back(Pair("connections", (int)vNodes.size()));
     obj.push_back(Pair("proxy", (proxy.IsValid() ? proxy.proxy.ToStringIPPort() : std::string())));
     obj.push_back(Pair("difficulty", (double)GetDifficulty()));
-    obj.push_back(Pair("testnet", Params().TestnetToBeDeprecatedFieldRPC()));
+    obj.push_back(Pair("testnet", Params().NetworkID() == CBaseChainParams::TESTNET));
 
     // During inital block verification chainActive.Tip() might be not yet initialized
     if (chainActive.Tip() == NULL) {
@@ -153,7 +153,8 @@ UniValue getinfo(const UniValue& params, bool fHelp)
 #ifdef ENABLE_WALLET
     if (pwalletMain) {
         obj.push_back(Pair("keypoololdest", pwalletMain->GetOldestKeyPoolTime()));
-        obj.push_back(Pair("keypoolsize", (int)pwalletMain->GetKeyPoolSize()));
+        size_t kpExternalSize = pwalletMain->KeypoolCountExternalKeys();
+        obj.push_back(Pair("keypoolsize", (int64_t)kpExternalSize));
     }
     if (pwalletMain && pwalletMain->IsCrypted())
         obj.push_back(Pair("unlocked_until", nWalletUnlockTime));
@@ -570,7 +571,7 @@ UniValue setmocktime(const UniValue& params, bool fHelp)
             "1. timestamp  (integer, required) Unix seconds-since-epoch timestamp\n"
             "   Pass 0 to go back to using the system time.");
 
-    if (!Params().MineBlocksOnDemand())
+    if (!Params().IsRegTestNet())
         throw std::runtime_error("setmocktime for regression testing (-regtest mode) only");
 
     LOCK(cs_main);

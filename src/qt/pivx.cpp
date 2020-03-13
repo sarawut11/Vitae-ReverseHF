@@ -56,9 +56,6 @@
 
 #if defined(QT_STATICPLUGIN)
 #include <QtPlugin>
-#if QT_VERSION < 0x050400
-Q_IMPORT_PLUGIN(AccessibleFactory)
-#endif
 #if defined(QT_QPA_PLATFORM_XCB)
 Q_IMPORT_PLUGIN(QXcbIntegrationPlugin);
 #elif defined(QT_QPA_PLATFORM_WINDOWS)
@@ -187,6 +184,8 @@ public:
     /// Create payment server
     void createPaymentServer();
 #endif
+    /// parameter interaction/setup based on rules
+    void parameterSetup();
     /// Create options model
     void createOptionsModel();
     /// Create main window
@@ -414,6 +413,12 @@ void BitcoinApplication::startThread()
     coreThread->start();
 }
 
+void BitcoinApplication::parameterSetup()
+{
+    InitLogging();
+    InitParameterInteraction();
+}
+
 void BitcoinApplication::requestInitialize()
 {
     qDebug() << __func__ << ": Requesting initialize";
@@ -529,10 +534,8 @@ int main(int argc, char* argv[])
     Q_INIT_RESOURCE(pivx_locale);
     Q_INIT_RESOURCE(pivx);
 
-#if QT_VERSION > 0x050100
     // Generate high-dpi pixmaps
     QApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
-#endif
 #if QT_VERSION >= 0x050600
     QGuiApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
 #endif
@@ -644,6 +647,8 @@ int main(int argc, char* argv[])
 #endif
     // Install qDebug() message handler to route to debug.log
     qInstallMessageHandler(DebugMessageHandler);
+    // Allow parameter interaction before we create the options model
+    app.parameterSetup();
     // Load GUI settings from QSettings
     app.createOptionsModel();
 

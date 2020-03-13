@@ -259,6 +259,7 @@ file(GLOB ZMQ_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/src/zmq/*.h)
 file(GLOB SCRIPT_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/src/script/*.h)
 file(GLOB RPC_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/src/rpc/*.h)
 file(GLOB COMPAT_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/src/compat/*.h)
+file(GLOB CONSENSUS_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/src/consensus/*.h)
 
 source_group("BitcoinHeaders" FILES
         ${HEADERS}
@@ -268,6 +269,7 @@ source_group("BitcoinHeaders" FILES
         ${SCRIPT_HEADERS}
         ${RPC_HEADERS}
         ${COMPAT_HEADERS}
+        ${CONSENSUS_HEADERS}
         ./src/support/cleanse.h
         )
 
@@ -346,9 +348,11 @@ set(WALLET_SOURCES
         ./src/masternodeman.cpp
         ./src/messagesigner.cpp
         ./src/zpiv/mintpool.cpp
+        ./src/wallet/hdchain.cpp
         ./src/wallet/rpcdump.cpp
         ./src/zpiv/deterministicmint.cpp
         ./src/zpiv/zerocoin.cpp
+        ./src/wallet/scriptpubkeyman.cpp
         ./src/wallet/rpcwallet.cpp
         ./src/kernel.cpp
         ./src/wallet/wallet.cpp
@@ -446,9 +450,11 @@ set(COMMON_SOURCES
         ./src/bip38.cpp
         ./src/chainparams.cpp
         ./src/coins.cpp
+        ./src/key_io.cpp
         ./src/compressor.cpp
         ./src/consensus/merkle.cpp
         ./src/consensus/tx_verify.cpp
+        ./src/consensus/zerocoin_verify.cpp
         ./src/primitives/block.cpp
         ./src/zpiv/deterministicmint.cpp
         ./src/primitives/transaction.cpp
@@ -491,6 +497,7 @@ set(UTIL_SOURCES
         ./src/rpc/protocol.cpp
         ./src/sync.cpp
         ./src/uint256.cpp
+        ./src/util/threadnames.cpp
         ./src/util.cpp
         ./src/utilstrencodings.cpp
         ./src/utilmoneystr.cpp

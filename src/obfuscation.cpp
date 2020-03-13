@@ -295,11 +295,12 @@ void CObfuscationPool::ChargeFees()
     r = rand() % 100;
     int target = 0;
 
+    const int pool_max_txs = GetMaxPoolTransactions();
     //mostly offending?
-    if (offences >= Params().PoolMaxTransactions() - 1 && r > 33) return;
+    if (offences >= pool_max_txs - 1 && r > 33) return;
 
     //everyone is an offender? That's not right
-    if (offences >= Params().PoolMaxTransactions()) return;
+    if (offences >= pool_max_txs) return;
 
     //charge one of the offenders randomly
     if (offences > 1) target = 50;
@@ -587,7 +588,7 @@ void ThreadCheckObfuScationPool()
     if (fLiteMode) return; //disable all Obfuscation/Masternode related functionality
 
     // Make this thread recognisable as the wallet flushing thread
-    RenameThread("pivx-obfuscation");
+    util::ThreadRename("pivx-obfuscation");
     LogPrintf("Masternodes thread started\n");
 
     unsigned int c = 0;

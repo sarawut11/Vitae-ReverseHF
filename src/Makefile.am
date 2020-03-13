@@ -19,7 +19,8 @@ else
 LIBUNIVALUE = $(UNIVALUE_LIBS)
 endif
 
-BITCOIN_INCLUDES=-I$(builddir) $(BDB_CPPFLAGS) $(BOOST_CPPFLAGS) $(LEVELDB_CPPFLAGS) $(CRYPTO_CFLAGS) $(SSL_CFLAGS)
+BITCOIN_CONFIG_INCLUDES=-I$(builddir)/config
+BITCOIN_INCLUDES=-I$(builddir) -I$(builddir)/obj $(BDB_CPPFLAGS) $(BOOST_CPPFLAGS) $(LEVELDB_CPPFLAGS) $(CRYPTO_CFLAGS) $(SSL_CFLAGS)
 
 BITCOIN_INCLUDES += -I$(srcdir)/secp256k1/include
 BITCOIN_INCLUDES += $(UNIVALUE_CFLAGS)
@@ -103,6 +104,8 @@ BITCOIN_CORE_H = \
   consensus/merkle.h \
   consensus/validation.h \
   consensus/tx_verify.h \
+  consensus/zerocoin_verify.h \
+  consensus/params.h \
   primitives/block.h \
   primitives/transaction.h \
   core_io.h \
@@ -123,6 +126,7 @@ BITCOIN_CORE_H = \
   kernel.h \
   swifttx.h \
   key.h \
+  key_io.h \
   keystore.h \
   leveldbwrapper.h \
   limitedmap.h \
@@ -151,6 +155,7 @@ BITCOIN_CORE_H = \
   rpc/server.h \
   scheduler.h \
   script/interpreter.h \
+  script/keyorigin.h \
   script/script.h \
   script/sigcache.h \
   script/sign.h \
@@ -173,12 +178,17 @@ BITCOIN_CORE_H = \
   guiinterface.h \
   uint256.h \
   undo.h \
+  util/memory.h \
   util.h \
+  util/macros.h \
+  util/threadnames.h \
   utilstrencodings.h \
   utilmoneystr.h \
   utiltime.h \
   validationinterface.h \
   version.h \
+  wallet/hdchain.h \
+  wallet/scriptpubkeyman.h \
   wallet/wallet.h \
   wallet/wallet_ismine.h \
   wallet/walletdb.h \
@@ -212,6 +222,7 @@ libbitcoin_server_a_SOURCES = \
   chain.cpp \
   checkpoints.cpp \
   consensus/tx_verify.cpp \
+  consensus/zerocoin_verify.cpp \
   httprpc.cpp \
   httpserver.cpp \
   init.cpp \
@@ -263,6 +274,7 @@ libbitcoin_wallet_a_SOURCES = \
   wallet/db.cpp \
   addressbook.cpp \
   crypter.cpp \
+  key_io.cpp \
   swifttx.cpp \
   masternode.cpp \
   masternode-budget.cpp \
@@ -274,6 +286,8 @@ libbitcoin_wallet_a_SOURCES = \
   wallet/rpcdump.cpp \
   wallet/rpcwallet.cpp \
   kernel.cpp \
+  wallet/hdchain.cpp \
+  wallet/scriptpubkeyman.cpp \
   wallet/wallet.cpp \
   wallet/wallet_ismine.cpp \
   wallet/wallet_zerocoin.cpp \
@@ -410,6 +424,7 @@ libbitcoin_util_a_SOURCES = \
   uint256.cpp \
   util.cpp \
   utilmoneystr.cpp \
+  util/threadnames.cpp \
   utilstrencodings.cpp \
   utiltime.cpp \
   $(BITCOIN_CORE_H)
@@ -530,6 +545,7 @@ CLEANFILES = $(EXTRA_LIBRARIES)
 
 CLEANFILES += *.gcda *.gcno
 CLEANFILES += compat/*.gcda compat/*.gcno
+CLEANFILES += consensus/*.gcda consensus/*.gcno
 CLEANFILES += crypto/*.gcda crypto/*.gcno
 CLEANFILES += libzerocoin/*.gcda libzerocoin/*.gcno
 CLEANFILES += primitives/*.gcda primitives/*.gcno
